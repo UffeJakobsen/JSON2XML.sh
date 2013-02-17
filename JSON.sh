@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 
 throw () {
   echo "$*" >&2
@@ -24,9 +25,9 @@ parse_array () {
     *)
       while :
       do
-        parse_value "$1" "$index"
+        parse_value "$1" "array_elem$index"
         let index=$index+1
-        ary="$ary""$value" 
+        ary="$ary""$value"
         read -r token
         case "$token" in
           ']') break ;;
@@ -37,7 +38,6 @@ parse_array () {
       done
       ;;
   esac
-  value=`printf '[%s]' "$ary"`
 }
 
 parse_object () {
@@ -60,7 +60,7 @@ parse_object () {
         esac
         read -r token
         parse_value "$1" "$key"
-        obj="$obj$key:$value"        
+        obj="$obj$key:$value"
         read -r token
         case "$token" in
           '}') break ;;
@@ -71,24 +71,36 @@ parse_object () {
       done
     ;;
   esac
-  value=`printf '{%s}' "$obj"`
 }
 
 parse_value () {
-  local jpath="${1:+$1,}$2"
+  local jpath=$(echo "$2" | tr -d "\"")
+
   case "$token" in
-    '{') parse_object "$jpath" ;;
-    '[') parse_array  "$jpath" ;;
+    '{')
+        echo "<$jpath>"
+        parse_object "$jpath"
+        echo "</$jpath>"
+        ;;
+    '[')
+        echo "<$jpath>"
+        parse_array "$jpath"
+        echo "</$jpath>"
+        ;;
     # At this point, the only valid single-character tokens are digits.
     ''|[^0-9]) throw "EXPECTED value GOT ${token:-EOF}" ;;
-    *) value=$token ;;
+    *)
+        value=$token
+        echo "<$jpath>$value</$jpath>"
+        ;;
   esac
-  printf "[%s]\t%s\n" "$jpath" "$value"
+
 }
 
 parse () {
+  echo '<?xml version="1.0"?>'
   read -r token
-  parse_value
+  parse_value "" "json"
   read -r token
   case "$token" in
     '') ;;
